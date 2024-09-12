@@ -39,6 +39,7 @@ SpriteSelector :: struct {
 
 Player :: struct {
     pos: [2]f32,
+    size: [2]f32,
     vel: [2]f32,
     grounded: bool,
     spritesheet: rl.Texture
@@ -73,7 +74,7 @@ main :: proc() {
         spritesheet = spritesheet_texture
     }
 
-    player := Player{spritesheet = spritesheet_texture, grounded = true}
+    player := Player{size={1, 1}, spritesheet = spritesheet_texture, grounded = true}
 
     mode := Mode.Editing
 
@@ -146,7 +147,7 @@ main :: proc() {
                     player.grounded = false
                 }
             }
-            player_update(&player, dt)
+            player_update(&player, &level, dt)
         }
     }
 }
@@ -172,30 +173,48 @@ draw_selector :: proc(selector: SpriteSelector) {
     rl.DrawTextureEx(selector.spritesheet, selector.pos, 0, selector.scale, rl.WHITE)
 }
 
-player_update :: proc(player: ^Player, dt: f32) {
+player_update :: proc(player: ^Player, level: ^Level, dt: f32) {
     unit_scale: f32 = sprite_size*scale
     gravity: f32 = 18
     max_vel: f32 = 300
     player.vel.y += gravity*dt
-    player.pos += player.vel*dt
 
-    if player.pos.x < 0 {
-        player.pos.x = 0
-        player.vel.x = 0
+    player.pos.x = player.pos.x + player.vel.x*dt
+
+    top_left: [2]int
+    player_rect: rl.Rectangle
+    top_left = linalg.to_int(linalg.floor(player.pos))
+    player_rect = rl.Rectangle{player.pos.x, player.pos.y, player.size.x, player.size.y}
+    for rect in tiles_around(level^, top_left.x, top_left.y) {
+        if rl.CheckCollisionRecs(rect, player_rect) {
+            if player.vel.x > 0 {
+                player.pos.x = rect.x - player.size.x
+                player.vel.x = 0
+            }
+            if player.vel.x < 0 {
+                player.pos.x = rect.x + rect.width
+                player.vel.x = 0
+            }
+        }
     }
-    if player.pos.y < 0 {
-        player.pos.y = 0
-        player.vel.y = 0
+    player.pos.y = player.pos.y + player.vel.y*dt
+
+    top_left = linalg.to_int(linalg.floor(player.pos))
+    player_rect = rl.Rectangle{player.pos.x, player.pos.y, player.size.x, player.size.y}
+    for rect in tiles_around(level^, top_left.x, top_left.y) {
+        if rl.CheckCollisionRecs(rect, player_rect) {
+            if player.vel.y > 0 {
+                player.pos.y = rect.y - player.size.y
+                player.vel.y = 0
+                player.grounded = true
+            }
+            if player.vel.y < 0 {
+                player.pos.y = rect.y + rect.height
+                player.vel.y = 0
+            }
+        }
     }
-    if player.pos.x > level_width-1 {
-        player.pos.x = level_width-1
-        player.vel.x = 0
-    }
-    if player.pos.y > level_height-1 {
-        player.pos.y = level_height-1
-        player.vel.y = 0
-        player.grounded = true
-    }
+
     if math.abs(player.vel.x) > max_vel {
         player.vel.x = math.sign(player.vel.x)*max_vel
     }
@@ -210,4 +229,22 @@ player_update :: proc(player: ^Player, dt: f32) {
             player.vel.x = 0
         }
     }
+}
+
+position_is_in_level :: proc(level: Level, x, y: int) -> bool {
+    return x >= 0 && y >= 0 && x < len(level.tiles[0]) && y < len(level.tiles);
+}
+
+tiles_around :: proc(level: Level, x, y: int) -> [dynamic]rl.Rectangle {
+    tiles := make([dynamic]rl.Rectangle, allocator = context.temp_allocator)
+    for i in x-1..=x+1 {
+        for j in y-1..=y+1 {
+            if position_is_in_level(level, i, j) {
+                if level.tiles[j][i] > 0 {
+                    append(&tiles, rl.Rectangle{f32(i), f32(j), 1, 1})
+                }
+            }
+        }
+    }
+    return tiles
 }
