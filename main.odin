@@ -19,8 +19,20 @@ Mode :: enum {
     Playing
 }
 
+Layer :: enum {
+    Background,
+    Foreground
+}
+
+Tile :: struct {
+    sprite_id: int,
+    layer: Layer
+}
+
 Level :: struct {
-    tiles: [level_height][level_width]int,
+    tiles: map[[2]int]Tile,
+    width: int,
+    height: int,
     spritesheet: rl.Texture
 }
 
@@ -51,13 +63,14 @@ main :: proc() {
     rl.SetTargetFPS(144)
     rl.SetExitKey(.Q)
 
-    spritesheet := rl.LoadImage("kenney_pico-8-platformer/Default/Tilemap/tilemap_packed.png")
+    spritesheet := rl.LoadImage("kenney_pico-8-platformer/Transparent/Tilemap/tilemap_packed.png")
     defer rl.UnloadImage(spritesheet)
     spritesheet_texture := rl.LoadTextureFromImage(spritesheet)
     defer rl.UnloadTexture(spritesheet_texture)
 
-    level := Level{spritesheet = spritesheet_texture}
-    level_win_size := [2]f32{sprite_size*len(level.tiles[0])*scale, sprite_size*len(level.tiles)*scale}
+    level := create_level(level_width, level_height, spritesheet_texture)
+    defer destroy_level(level)
+    level_win_size := [2]f32{f32(sprite_size*level.width*scale), f32(sprite_size*level.height*scale)}
     level_win := LevelWindow {
         pos = [2]f32{win_width/2 - level_win_size.x/2, 0},
         size = level_win_size
@@ -77,6 +90,7 @@ main :: proc() {
     player := Player{size={1, 1}, spritesheet = spritesheet_texture, grounded = true}
 
     mode := Mode.Editing
+    editing_layer := Layer.Foreground
 
     for !rl.WindowShouldClose() {
         dt := rl.GetFrameTime()
@@ -115,6 +129,10 @@ main :: proc() {
             if rl.IsKeyPressed(.C) {
                 level.tiles = {}
             }
+            if rl.IsKeyPressed(.L) {
+                if editing_layer == .Background do editing_layer = .Foreground
+                else if editing_layer == .Foreground do editing_layer = .Background
+            }
 
             if rl.IsMouseButtonDown(.LEFT) {
                 pos := rl.GetMousePosition()
@@ -124,7 +142,10 @@ main :: proc() {
                     if selection == 90 {
                         player.pos = {f32(col), f32(row)}
                     } else {
-                        level.tiles[row][col] = selection
+                        level.tiles[{col,row}] = Tile {
+                            sprite_id = selection,
+                            layer = editing_layer
+                        }
                     }
                 } else if pos.x >= selector.pos.x && pos.y >= selector.pos.y && pos.x < selector.pos.x + selector.size.x && pos.y < selector.pos.y + selector.size.y {
                     col := int((pos.x - selector.pos.x) / (sprite_size*scale))
@@ -152,20 +173,32 @@ main :: proc() {
     }
 }
 
+create_level :: proc(width, height: int, spritesheet: rl.Texture) -> Level {
+    return Level {
+        tiles = make(map[[2]int]Tile),
+        width = width,
+        height = height,
+        spritesheet = spritesheet
+    }
+}
+
+destroy_level :: proc(level: Level) {
+    delete(level.tiles)
+}
+
 sprite_rect :: proc(selection: int) -> rl.Rectangle {
     return rl.Rectangle{f32(selection%15)*sprite_size, f32(selection/15)*sprite_size, sprite_size, sprite_size}
 }
 
 draw_level :: proc(level: Level, window: LevelWindow) {
-    for row, y in level.tiles {
-        for cell, x in row {
-            rl.DrawTexturePro(level.spritesheet, sprite_rect(cell), {window.pos.x + f32(x)*sprite_size*scale, window.pos.y + f32(y)*sprite_size*scale, sprite_size*scale, sprite_size*scale}, {0,0}, 0, rl.WHITE)
-        }
+    rl.DrawRectangleGradientV(i32(window.pos.x), i32(window.pos.y), i32(window.size.x), i32(window.size.y), {50, 50, 50, 255}, {100, 100, 100, 255})
+    for pos, tile in level.tiles {
+        rl.DrawTexturePro(level.spritesheet, sprite_rect(tile.sprite_id), {window.pos.x + f32(pos.x)*sprite_size*scale, window.pos.y + f32(pos.y)*sprite_size*scale, sprite_size*scale, sprite_size*scale}, {0,0}, 0, rl.WHITE)
     }
 }
 
 draw_player :: proc(player: Player, window: LevelWindow) {
-    pos := player.pos
+    pos := linalg.floor(player.pos*8)/8
     rl.DrawTexturePro(player.spritesheet, sprite_rect(90), {window.pos.x + pos.x*sprite_size*scale, window.pos.y + pos.y*sprite_size*scale, sprite_size*scale, sprite_size*scale}, {0,0}, 0, rl.WHITE)
 }
 
@@ -232,7 +265,7 @@ player_update :: proc(player: ^Player, level: ^Level, dt: f32) {
 }
 
 position_is_in_level :: proc(level: Level, x, y: int) -> bool {
-    return x >= 0 && y >= 0 && x < len(level.tiles[0]) && y < len(level.tiles);
+    return x >= 0 && y >= 0 && x < level.width && y < level.height;
 }
 
 tiles_around :: proc(level: Level, x, y: int) -> [dynamic]rl.Rectangle {
@@ -240,7 +273,8 @@ tiles_around :: proc(level: Level, x, y: int) -> [dynamic]rl.Rectangle {
     for i in x-1..=x+1 {
         for j in y-1..=y+1 {
             if position_is_in_level(level, i, j) {
-                if level.tiles[j][i] > 0 {
+                tile, ok := level.tiles[{i,j}]
+                if ok && tile.layer == .Foreground {
                     append(&tiles, rl.Rectangle{f32(i), f32(j), 1, 1})
                 }
             }
