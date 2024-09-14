@@ -2,6 +2,7 @@ package main
 
 import "core:math"
 import "core:math/linalg"
+import "core:slice"
 import rl "vendor:raylib"
 
 Mode :: enum {
@@ -24,11 +25,19 @@ Tile :: struct {
     layer: Layer
 }
 
+AnimatedSprite :: struct {
+    sprite_indexes: []int,
+    secs_per_frame: f32,
+    secs_since_last_frame: f32,
+    current_frame: int
+}
+
 Player :: struct {
     pos: [2]f32,
     size: [2]f32,
     vel: [2]f32,
     grounded: bool,
+    animation: AnimatedSprite
 }
 
 Level :: struct {
@@ -80,8 +89,11 @@ level_editor_create :: proc(level: ^Level, window: Window) -> LevelEditor {
 
 level_create :: proc(width, height: int, spritesheet: rl.Texture) -> Level {
     return Level {
-        player = Player{size={1, 1}, //spritesheet = spritesheet_texture,
-        grounded = true},
+        player = Player{
+            size={1, 1},
+            grounded = true,
+            animation = animated_sprite_create({90, 91, 92}, 0.3)
+        },
         tiles = make(map[[2]int]Tile),
         width = width,
         height = height,
@@ -94,6 +106,7 @@ level_destroy :: proc(level: ^Level) {
 }
 
 player_update :: proc(player: ^Player, level: ^Level, dt: f32) {
+    animated_sprite_update(&player.animation, dt)
     unit_scale: f32 = sprite_size*scale
     gravity: f32 = 18
     max_vel: f32 = 300
@@ -168,4 +181,25 @@ tiles_around :: proc(level: Level, x, y: int) -> [dynamic]rl.Rectangle {
         }
     }
     return tiles
+}
+
+animated_sprite_create :: proc(sprite_indexes: []int, secs_per_frame: f32) -> AnimatedSprite {
+    return AnimatedSprite {
+        sprite_indexes = slice.clone(sprite_indexes),
+        secs_per_frame = secs_per_frame,
+        secs_since_last_frame = 0,
+        current_frame = 0
+    }
+}
+
+animated_sprite_destroy :: proc(sprite: ^AnimatedSprite) {
+    delete(sprite.sprite_indexes)
+}
+
+animated_sprite_update :: proc(sprite: ^AnimatedSprite, dt: f32) {
+    sprite.secs_since_last_frame += dt
+    if sprite.secs_since_last_frame >= sprite.secs_per_frame {
+        sprite.secs_since_last_frame = 0
+        sprite.current_frame = (sprite.current_frame + 1) % len(sprite.sprite_indexes)
+    }
 }
