@@ -32,12 +32,19 @@ AnimatedSprite :: struct {
     current_frame: int
 }
 
+PlayerState :: enum {
+    Idle,
+    Walking,
+    Jumping
+}
+
 Player :: struct {
     pos: [2]f32,
     size: [2]f32,
     vel: [2]f32,
     grounded: bool,
-    animation: AnimatedSprite
+    state: PlayerState,
+    animations: [PlayerState]AnimatedSprite
 }
 
 Level :: struct {
@@ -92,7 +99,12 @@ level_create :: proc(width, height: int, spritesheet: rl.Texture) -> Level {
         player = Player{
             size={1, 1},
             grounded = true,
-            animation = animated_sprite_create({90, 91, 92}, 0.3)
+            state = .Idle,
+            animations = {
+                .Idle = animated_sprite_create({90}, 0.3),
+                .Walking = animated_sprite_create({91, 92}, 0.3),
+                .Jumping = animated_sprite_create({92}, 0.3),
+            }
         },
         tiles = make(map[[2]int]Tile),
         width = width,
@@ -106,7 +118,7 @@ level_destroy :: proc(level: ^Level) {
 }
 
 player_update :: proc(player: ^Player, level: ^Level, dt: f32) {
-    animated_sprite_update(&player.animation, dt)
+    animated_sprite_update(&player.animations[player.state], dt)
     unit_scale: f32 = sprite_size*scale
     gravity: f32 = 18
     max_vel: f32 = 300
@@ -161,6 +173,14 @@ player_update :: proc(player: ^Player, level: ^Level, dt: f32) {
         if math.abs(player.vel.x) < 0.1 {
             player.vel.x = 0
         }
+    }
+
+    if !player.grounded {
+        player.state = .Jumping
+    } else if player.vel.x != 0 {
+        player.state = .Walking
+    } else {
+        player.state = .Idle
     }
 }
 

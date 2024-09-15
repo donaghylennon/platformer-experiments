@@ -165,7 +165,12 @@ draw_level :: proc(level: Level, window: Window) {
 
 draw_player :: proc(player: Player, level: Level, window: Window) {
     pos := player.pos
-    rl.DrawTexturePro(level.spritesheet, sprite_rect(player.animation.sprite_indexes[player.animation.current_frame]), {window.pos.x + pos.x*sprite_size*scale, window.pos.y + pos.y*sprite_size*scale, sprite_size*scale, sprite_size*scale}, {0,0}, 0, rl.WHITE)
+    anim := player.animations[player.state]
+    sprite_rect := sprite_rect(anim.sprite_indexes[anim.current_frame])
+    if player.vel.x < 0 {
+        sprite_rect = {sprite_rect.x, sprite_rect.y, -sprite_rect.width, sprite_rect.height}
+    }
+    rl.DrawTexturePro(level.spritesheet, sprite_rect, {window.pos.x + pos.x*sprite_size*scale, window.pos.y + pos.y*sprite_size*scale, sprite_size*scale, sprite_size*scale}, {0,0}, 0, rl.WHITE)
 }
 
 draw_selector :: proc(selector: SpriteSelector, window: Window) {
