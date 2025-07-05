@@ -52,7 +52,8 @@ Level :: struct {
     tiles: map[[2]int]Tile,
     width: int,
     height: int,
-    spritesheet: rl.Texture
+    spritesheet: rl.Texture,
+    slimesheet: rl.Texture
 }
 
 LevelEditor :: struct {
@@ -94,22 +95,23 @@ level_editor_create :: proc(level: ^Level, window: Window) -> LevelEditor {
     }
 }
 
-level_create :: proc(width, height: int, spritesheet: rl.Texture) -> Level {
+level_create :: proc(width, height: int, spritesheet: rl.Texture, slimesheet: rl.Texture) -> Level {
     return Level {
         player = Player{
             size={1, 1},
             grounded = true,
             state = .Idle,
             animations = {
-                .Idle = animated_sprite_create({90}, 0.3),
-                .Walking = animated_sprite_create({91, 92}, 0.3),
-                .Jumping = animated_sprite_create({92}, 0.3),
+                .Idle = animated_sprite_create({0,1}, 0.3),
+                .Walking = animated_sprite_create({0,1}, 0.3),
+                .Jumping = animated_sprite_create({2,3}, 1.2),
             }
         },
         tiles = make(map[[2]int]Tile),
         width = width,
         height = height,
-        spritesheet = spritesheet
+        spritesheet = spritesheet,
+        slimesheet = slimesheet,
     }
 }
 

@@ -39,7 +39,12 @@ main :: proc() {
     spritesheet_texture := rl.LoadTextureFromImage(spritesheet)
     defer rl.UnloadTexture(spritesheet_texture)
 
-    level := level_create(level_width, level_height, spritesheet_texture)
+    slimesheet := rl.LoadImage("/home/lennon/pictures/game-dev/slime.png")
+    defer rl.UnloadImage(slimesheet)
+    slimesheet_texture := rl.LoadTextureFromImage(slimesheet)
+    defer rl.UnloadTexture(slimesheet_texture)
+
+    level := level_create(level_width, level_height, spritesheet_texture, slimesheet_texture)
     defer level_destroy(&level)
     level_win_size := [2]f32{f32(sprite_size*level.width*scale), f32(sprite_size*level.height*scale)}
 
@@ -132,6 +137,8 @@ main :: proc() {
             }
             player_update(&game.level.player, game.level, dt)
         }
+
+        free_all(context.temp_allocator)
     }
 }
 
@@ -170,7 +177,7 @@ draw_player :: proc(player: Player, level: Level, window: Window) {
     if player.vel.x < 0 {
         sprite_rect = {sprite_rect.x, sprite_rect.y, -sprite_rect.width, sprite_rect.height}
     }
-    rl.DrawTexturePro(level.spritesheet, sprite_rect, {window.pos.x + pos.x*sprite_size*scale, window.pos.y + pos.y*sprite_size*scale, sprite_size*scale, sprite_size*scale}, {0,0}, 0, rl.WHITE)
+    rl.DrawTexturePro(level.slimesheet, sprite_rect, {window.pos.x + pos.x*sprite_size*scale, window.pos.y + pos.y*sprite_size*scale, sprite_size*scale, sprite_size*scale}, {0,0}, 0, rl.WHITE)
 }
 
 draw_selector :: proc(selector: SpriteSelector, window: Window) {
